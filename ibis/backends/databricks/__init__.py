@@ -7,6 +7,7 @@ import functools
 import getpass
 import json
 import os
+import re
 import sys
 import tempfile
 from typing import TYPE_CHECKING, Any
@@ -639,7 +640,12 @@ class MemtableManager:
     def _generate_volume_path(self) -> str:
         """Has runtime effects: prompts the user for a password, and fetches the current database and catalog from the backend."""
         short_version = "".join(map(str, sys.version_info[:3]))
-        volume_name = f"{getpass.getuser()}-py={short_version}-pid={os.getpid()}"
+        # Sanitize the username to replace characters invalid in volume names.
+        # For example, a username like "first.last" contains a period which
+        # Databricks SQL interprets as an identifier separator, causing the volume
+        # name to be split into multiple parts (see ibis-project/ibis#11950).
+        username = re.sub(r"[^a-zA-Z0-9_-]", "_", getpass.getuser())
+        volume_name = f"{username}-py={short_version}-pid={os.getpid()}"
         return f"/Volumes/{self._backend.current_catalog}/{self._backend.current_database}/{volume_name}"
 
     def _create_volume(self, path: str) -> None:

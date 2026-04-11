@@ -1346,25 +1346,11 @@ def string_temp_table(backend, con):
             lambda t: t.string_col.lstrip(),
             lambda t: t.str.lstrip(),
             id="lstrip",
-            marks=[
-                pytest.mark.notyet(
-                    ["pyspark", "databricks"],
-                    raises=AssertionError,
-                    reason="Spark SQL LTRIM doesn't accept characters to trim",
-                ),
-            ],
         ),
         param(
             lambda t: t.string_col.rstrip(),
             lambda t: t.str.rstrip(),
             id="rstrip",
-            marks=[
-                pytest.mark.notyet(
-                    ["pyspark", "databricks"],
-                    raises=AssertionError,
-                    reason="Spark SQL RTRIM doesn't accept characters to trim",
-                ),
-            ],
         ),
         param(
             lambda t: t.string_col.strip(),
@@ -1515,3 +1501,48 @@ def test_string_methods_no_accents_and_no_emoji(
     expected = expected_func(series)
 
     backend.assert_series_equal(result, expected)
+
+
+@pytest.mark.never(["druid"], reason="can't create tables")
+@pytest.mark.parametrize(
+    "fn, expected",
+    [
+        param(
+            lambda t: t.s.strip(),
+            ["fXXXf", "XXX", "fXXXf"],
+            id="strip",
+        ),
+        param(
+            lambda t: t.s.lstrip(),
+            ["fXXXf  ", "XXX  ", "fXXXf  "],
+            id="lstrip",
+        ),
+        param(
+            lambda t: t.s.rstrip(),
+            ["  fXXXf", "  XXX", "  fXXXf"],
+            id="rstrip",
+        ),
+    ],
+)
+def test_strip_does_not_remove_f(con, backend, fn, expected):
+    """Regression test for https://github.com/ibis-project/ibis/issues/11894.
+
+    strip() was treating 'f' as whitespace in backends that use the SQL TRIM
+    function with an explicit whitespace character set, because the form-feed
+    character (\\x0c) was represented as the escape sequence \\f in the SQL
+    string literal, and some SQL engines (e.g. Spark SQL) don't support \\f as
+    an escape sequence and treated it as the literal character 'f'.
+    """
+    temp_name = gen_name("strip_regression")
+    rows = pd.DataFrame(
+        {"s": ["  fXXXf  ", "  XXX  ", "  fXXXf  "], "i": [0, 1, 2]}
+    )
+    if backend.name() == "athena":
+        pytest.xfail("not yet supported")
+    t = con.create_table(temp_name, rows, temp=backend.name() == "flink" or None)
+    try:
+        result = fn(t).order_by(t.i).to_pandas()
+        expected_series = pd.Series(expected, name="s")
+        backend.assert_series_equal(result, expected_series)
+    finally:
+        con.drop_table(temp_name, force=True)

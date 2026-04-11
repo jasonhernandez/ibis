@@ -85,8 +85,6 @@ class PySparkCompiler(SQLGlotCompiler):
         ops.EndsWith: "endswith",
         ops.Hash: "hash",
         ops.Log10: "log10",
-        ops.LStrip: "ltrim",
-        ops.RStrip: "rtrim",
         ops.MapLength: "size",
         ops.MapContains: "map_contains_key",
         ops.MapMerge: "map_concat",
@@ -452,6 +450,15 @@ class PySparkCompiler(SQLGlotCompiler):
             return self.if_(pos > 0, pos + start, 0)
 
         return self.f.instr(arg, substr)
+
+    def visit_Strip(self, op, *, arg):
+        return self.f.regexp_replace(arg, sge.Literal.string(r"^\s+|\s+$"), sge.Literal.string(""))
+
+    def visit_LStrip(self, op, *, arg):
+        return self.f.regexp_replace(arg, sge.Literal.string(r"^\s+"), sge.Literal.string(""))
+
+    def visit_RStrip(self, op, *, arg):
+        return self.f.regexp_replace(arg, sge.Literal.string(r"\s+$"), sge.Literal.string(""))
 
     def visit_RegexReplace(self, op, *, arg, pattern, replacement):
         return self.f.regexp_replace(arg, pattern, replacement)

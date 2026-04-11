@@ -359,7 +359,9 @@ class BigQueryCompiler(SQLGlotCompiler):
         return self.f.st_simplify(arg, tolerance)
 
     def visit_ApproxMedian(self, op, *, arg, where):
-        return self.agg.approx_quantiles(arg, 2, where=where)[self.f.offset(1)]
+        if where is not None:
+            arg = self.if_(where, arg, NULL)
+        return self.f.approx_quantiles(arg, 2)[self.f.offset(1)]
 
     def visit_Pi(self, op):
         return self.f.acos(-1)

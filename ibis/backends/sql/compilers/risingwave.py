@@ -166,7 +166,7 @@ class RisingWaveCompiler(PostgresCompiler):
             return self.f.map_from_key_values(
                 self.f.array(*value.keys()), self.f.array(*value.values())
             )
-        return None
+        return super().visit_NonNullLiteral(op, value=value, dtype=dtype)
 
     def visit_MapGet(self, op, *, arg, key, default):
         if op.dtype.is_null():

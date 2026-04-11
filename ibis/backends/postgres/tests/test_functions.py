@@ -151,8 +151,7 @@ def test_strftime(con, pattern):
         param(L("foo_bar"), "text", id="text"),
         param(L(5), "integer", id="integer"),
         param(ibis.null(), "null", id="null"),
-        # TODO(phillipc): should this really be double?
-        param(L(1.2345), "numeric", id="numeric"),
+        param(L(1.2345), "double precision", id="double_precision"),
         param(
             L(
                 datetime(
@@ -173,6 +172,21 @@ def test_strftime(con, pattern):
 )
 def test_typeof(con, value, expected):
     assert con.execute(value.typeof()) == expected
+
+
+def test_float_literal_to_pyarrow(con):
+    """Regression test for https://github.com/ibis-project/ibis/issues/11947.
+
+    Float literals should compile to typed SQL (e.g. CAST(0.5518 AS DOUBLE
+    PRECISION)) rather than bare numeric literals, which PostgreSQL interprets
+    as the numeric (Decimal) type.
+    """
+    table = ibis.memtable({"x": [1.0, 2.0, 3.0]})
+    expr = table.mutate(v=ibis.literal(0.5518, type="float64"))
+    result = con.to_pyarrow(expr)
+    assert result.schema.field("v").type.equals(
+        __import__("pyarrow").float64()
+    )
 
 
 @pytest.mark.parametrize(("value", "expected"), [("foo_bar", 7), ("", 0)])
